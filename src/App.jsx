@@ -29,6 +29,35 @@ function CameraIcon() {
 
 function App() {
   const [permissionNotice, setPermissionNotice] = useState('')
+  const [desktopMessage, setDesktopMessage] = useState('')
+
+  async function handleAboutClick() {
+    if (!window.athena?.getAppInfo) {
+      setDesktopMessage('App information is available in the desktop app.')
+      return
+    }
+
+    try {
+      const appInfo = await window.athena.getAppInfo()
+      setDesktopMessage(`${appInfo.name} · Version ${appInfo.version}`)
+    } catch {
+      setDesktopMessage('Could not load app information. Please try again.')
+    }
+  }
+
+  async function handleRulesClick() {
+    if (!window.athena?.showExamRules) {
+      setDesktopMessage('Native exam rules are available in the desktop app.')
+      return
+    }
+
+    try {
+      await window.athena.showExamRules()
+      setDesktopMessage('Exam rules were shown in a desktop dialog.')
+    } catch {
+      setDesktopMessage('Could not show exam rules. Please try again.')
+    }
+  }
 
   return (
     <main className="app-shell">
@@ -126,9 +155,21 @@ function App() {
         </section>
 
         <footer className="page-footer">
-          <span>Newton Athena</span>
-          <span>Ready when you are.</span>
+          <span>Newton Athena · Ready when you are.</span>
+          <div className="footer-actions">
+            <button className="footer-action" onClick={handleRulesClick} type="button">
+              View exam rules
+            </button>
+            <button className="footer-action" onClick={handleAboutClick} type="button">
+              About this app
+            </button>
+          </div>
         </footer>
+        {desktopMessage && (
+          <p aria-live="polite" className="desktop-message" role="status">
+            {desktopMessage}
+          </p>
+        )}
       </div>
     </main>
   )

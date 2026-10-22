@@ -1,4 +1,13 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { fileURLToPath } from 'node:url'
+
+const preloadPath = fileURLToPath(new URL('./preload.js', import.meta.url))
+
+// IPC channels are kept in the main process so the renderer cannot choose a channel.
+const IPC_CHANNELS = {
+  getAppInfo: 'athena:get-app-info',
+  showExamRules: 'athena:show-exam-rules',
+}
 
 // Create the desktop window after Electron has finished starting up.
 function createWindow() {
@@ -8,6 +17,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
+      preload: preloadPath,
       // Keep browser pages isolated from Node.js and its native APIs.
       nodeIntegration: false,
       contextIsolation: true,
@@ -17,6 +27,28 @@ function createWindow() {
   // During development, show the React app served by Vite.
   window.loadURL('http://127.0.0.1:5173')
 }
+
+// Handle only the specific, limited requests exposed by the preload script.
+ipcMain.handle(IPC_CHANNELS.getAppInfo, () => ({
+  name: app.getName(),
+  version: app.getVersion(),
+}))
+
+ipcMain.handle(IPC_CHANNELS.showExamRules, (event) => {
+  const parentWindow = BrowserWindow.fromWebContents(event.sender)
+
+  return dialog.showMessageBox(parentWindow, {
+    type: 'info',
+    title: 'Exam rules',
+    message: 'Please follow these guidelines during your exam.',
+    detail: [
+      'Remain in the exam window throughout your session.',
+      'Keep your camera enabled when it is required.',
+      'Do not leave the exam without permission.',
+    ].join('\n'),
+    buttons: ['Close'],
+  })
+})
 
 app.whenReady().then(() => {
   createWindow()
