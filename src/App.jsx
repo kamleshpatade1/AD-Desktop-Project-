@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
 function CameraIcon() {
@@ -28,8 +28,146 @@ function CameraIcon() {
 }
 
 function App() {
-  const [permissionNotice, setPermissionNotice] = useState('')
+  const [cameraStatus, setCameraStatus] = useState('not-requested')
+  const [cameraError, setCameraError] = useState('')
+  const [cameraStream, setCameraStream] = useState(null)
   const [desktopMessage, setDesktopMessage] = useState('')
+  const videoRef = useRef(null)
+  const cameraStreamRef = useRef(null)
+  const cameraRequestRef = useRef(0)
+  const requestInProgressRef = useRef(false)
+  const mountedRef = useRef(false)
+  const isCameraActive =
+    cameraStatus === 'granted' &&
+    cameraStream?.getVideoTracks().some((track) => track.readyState === 'live')
+
+  useEffect(() => {
+    const videoElement = videoRef.current
+    mountedRef.current = true
+
+    return () => {
+      mountedRef.current = false
+      cameraRequestRef.current += 1
+      requestInProgressRef.current = false
+      cameraStreamRef.current?.getTracks().forEach((track) => {
+        track.onended = null
+        track.stop()
+      })
+      cameraStreamRef.current = null
+      if (videoElement) {
+        videoElement.srcObject = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const videoElement = videoRef.current
+    if (videoElement) {
+      videoElement.srcObject = cameraStream
+    }
+
+    return () => {
+      if (videoElement?.srcObject === cameraStream) {
+        videoElement.srcObject = null
+      }
+    }
+  }, [cameraStream])
+
+  async function handleCameraRequest() {
+    if (requestInProgressRef.current || cameraStreamRef.current) {
+      return
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus('error')
+      setCameraError('Camera access is not available in this environment.')
+      return
+    }
+
+    requestInProgressRef.current = true
+    const requestId = ++cameraRequestRef.current
+    setCameraStatus('requesting')
+    setCameraError('')
+
+    try {
+      // Ask for video only, and only after the user presses the permission button.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      })
+
+      if (!mountedRef.current || requestId !== cameraRequestRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+
+      if (!stream.getVideoTracks().some((track) => track.readyState === 'live')) {
+        stream.getTracks().forEach((track) => track.stop())
+        setCameraStatus('error')
+        setCameraError('No active camera video track was received. Please try again.')
+        return
+      }
+
+      cameraStreamRef.current = stream
+      stream.getTracks().forEach((track) => {
+        track.onended = () => {
+          if (cameraStreamRef.current !== stream) {
+            return
+          }
+
+          stream.getTracks().forEach((streamTrack) => {
+            streamTrack.onended = null
+            streamTrack.stop()
+          })
+          cameraStreamRef.current = null
+          setCameraStream(null)
+          setCameraStatus('error')
+          setCameraError('The camera stream ended. Please request permission again.')
+        }
+      })
+      setCameraStream(stream)
+      setCameraStatus('granted')
+    } catch (error) {
+      if (mountedRef.current && requestId === cameraRequestRef.current) {
+        if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+          setCameraStatus('denied')
+          setCameraError(
+            'Camera permission was denied. Check your device permissions and try again.',
+          )
+        } else {
+          setCameraStatus('error')
+          setCameraError(
+            error?.name === 'NotFoundError'
+              ? 'No camera was found. Connect a camera and try again.'
+              : 'The camera could not be started. Check that it is connected and not in use.',
+          )
+        }
+      }
+    } finally {
+      if (requestId === cameraRequestRef.current) {
+        requestInProgressRef.current = false
+      }
+    }
+  }
+
+  function handleStopCamera() {
+    cameraRequestRef.current += 1
+    requestInProgressRef.current = false
+
+    const stream = cameraStreamRef.current
+    cameraStreamRef.current = null
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    stream?.getTracks().forEach((track) => {
+      track.onended = null
+      track.stop()
+    })
+
+    setCameraStream(null)
+    setCameraStatus('not-requested')
+    setCameraError('')
+  }
 
   async function handleAboutClick() {
     if (!window.athena?.getAppInfo) {
@@ -98,29 +236,67 @@ function App() {
             </div>
           </div>
 
-          <div aria-live="polite" className="permission-status" role="status">
+          <div
+            aria-live="polite"
+            className={`permission-status permission-status--${cameraStatus}`}
+            role="status"
+          >
             <span aria-hidden="true" className="status-indicator" />
-            <span>Camera permission not granted</span>
+            <span>
+              {cameraStatus === 'not-requested' && 'Not requested'}
+              {cameraStatus === 'requesting' && 'Requesting camera permission…'}
+              {cameraStatus === 'granted' && 'Camera permission granted'}
+              {cameraStatus === 'denied' && 'Camera access denied'}
+              {cameraStatus === 'error' && 'Camera error'}
+            </span>
           </div>
 
-          <button
-            className="button button-primary"
-            onClick={() =>
-              setPermissionNotice(
-                'Camera access is not available yet. It will be enabled when desktop permissions are connected.',
-              )
-            }
-            type="button"
-          >
-            <CameraIcon />
-            Grant Camera Permission
-          </button>
-          {permissionNotice && (
-            <p className="permission-notice" role="status">
-              {permissionNotice}
+          <div className="camera-preview">
+            <video
+              aria-label="Live camera preview"
+              autoPlay
+              className="camera-video"
+              hidden={!cameraStream}
+              playsInline
+              ref={videoRef}
+              muted
+            />
+            {!cameraStream && (
+              <div className="preview-placeholder">
+                <CameraIcon />
+                <span>Camera preview will appear after permission is granted.</span>
+              </div>
+            )}
+          </div>
+
+          {!isCameraActive && (
+            <button
+              className="button button-primary"
+              disabled={cameraStatus === 'requesting'}
+              onClick={handleCameraRequest}
+              type="button"
+            >
+              <CameraIcon />
+              {cameraStatus === 'requesting'
+                ? 'Requesting Permission…'
+                : 'Grant Camera Permission'}
+            </button>
+          )}
+          {cameraError && (
+            <p className="permission-notice" role="alert">
+              {cameraError}
             </p>
           )}
-          <button className="button button-secondary" disabled type="button">
+          {isCameraActive && (
+            <button className="button button-stop" onClick={handleStopCamera} type="button">
+              Stop Camera
+            </button>
+          )}
+          <button
+            className="button button-secondary"
+            disabled={!isCameraActive}
+            type="button"
+          >
             Start Exam
           </button>
           <p className="availability-note">

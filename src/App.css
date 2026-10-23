@@ -2,8 +2,8 @@
   min-height: 100vh;
   padding: 0 6.25vw;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(92, 55, 176, 0.16), transparent 38rem),
-    #0b0d14;
+    radial-gradient(ellipse at 50% 0%, rgba(72, 133, 235, 0.1), transparent 38rem),
+    #f4f8ff;
 }
 
 .topbar {
@@ -11,14 +11,14 @@
   align-items: center;
   justify-content: space-between;
   min-height: 88px;
-  border-bottom: 1px solid #20222e;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  color: inherit;
+  color: var(--color-navy);
   text-decoration: none;
 }
 
@@ -27,10 +27,10 @@
   width: 38px;
   height: 38px;
   place-items: center;
-  border: 1px solid rgba(169, 133, 255, 0.42);
+  border: 1px solid #8db5f2;
   border-radius: 12px;
-  background: linear-gradient(145deg, #9c72f2, #603ab6);
-  box-shadow: 0 5px 24px rgba(116, 73, 204, 0.24);
+  background: linear-gradient(145deg, #4f8df5, #1d4ed8);
+  box-shadow: 0 5px 24px rgba(37, 99, 235, 0.2);
   color: #fff;
   font-size: 20px;
   font-weight: 700;
@@ -42,14 +42,14 @@
 }
 
 .brand-name {
-  color: #f3f1f9;
+  color: var(--color-navy);
   font-size: 15px;
   font-weight: 650;
   letter-spacing: 0.01em;
 }
 
 .brand-subtitle {
-  color: #9695a5;
+  color: var(--color-muted);
   font-size: 12px;
 }
 
@@ -57,10 +57,10 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  border: 1px solid #292a37;
+  border: 1px solid var(--color-border);
   border-radius: 999px;
   padding: 8px 12px;
-  color: #c0becb;
+  color: var(--color-text);
   font-size: 12px;
 }
 
@@ -68,8 +68,8 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #a78bfa;
-  box-shadow: 0 0 10px rgba(167, 139, 250, 0.65);
+  background: var(--color-primary);
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.32);
 }
 
 .page-content {
@@ -83,7 +83,7 @@
 }
 
 .eyebrow {
-  color: #b49af7;
+  color: var(--color-primary);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -91,7 +91,7 @@
 
 .welcome h1 {
   margin: 13px 0 11px;
-  color: #f5f3fa;
+  color: var(--color-navy);
   font-size: clamp(30px, 5vw, 38px);
   font-weight: 650;
   letter-spacing: -0.045em;
@@ -100,7 +100,7 @@
 
 .welcome p,
 .card-description {
-  color: #a5a4b2;
+  color: var(--color-muted);
   font-size: 14px;
   line-height: 1.65;
 }
@@ -111,10 +111,10 @@
 
 .permission-card,
 .rules-card {
-  border: 1px solid #292a38;
+  border: 1px solid var(--color-border);
   border-radius: 16px;
-  background: rgba(21, 22, 32, 0.9);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+  background: var(--color-surface);
+  box-shadow: 0 18px 50px rgba(31, 71, 125, 0.08);
 }
 
 .permission-card {
@@ -134,10 +134,10 @@
   height: 46px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid rgba(160, 126, 237, 0.24);
+  border: 1px solid #c7daf6;
   border-radius: 13px;
-  background: rgba(137, 98, 219, 0.13);
-  color: #b89aff;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
 }
 
 .camera-icon {
@@ -148,7 +148,7 @@
 .permission-card h2,
 .rules-card h2 {
   margin: 0 0 4px;
-  color: #f0eef7;
+  color: var(--color-navy);
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -164,13 +164,92 @@
   align-items: center;
   gap: 10px;
   margin: 23px 0 17px;
-  border: 1px solid #39303c;
+  border: 1px solid #c9dcf7;
   border-radius: 9px;
   padding: 13px 14px;
-  background: rgba(177, 98, 109, 0.07);
-  color: #e5c2c5;
+  background: #f0f6ff;
+  color: var(--color-navy);
   font-size: 13px;
   font-weight: 500;
+}
+
+.permission-status--requesting .status-indicator {
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+
+.permission-status--granted {
+  border-color: #b8d9c8;
+  background: #effaf4;
+  color: #174d35;
+}
+
+.permission-status--granted .status-indicator {
+  background: #24804f;
+  box-shadow: 0 0 0 3px rgba(36, 128, 79, 0.12);
+}
+
+.permission-status--denied,
+.permission-status--error {
+  border-color: #f0c8c8;
+  background: #fff5f5;
+  color: #7f2931;
+}
+
+.permission-status--denied .status-indicator,
+.permission-status--error .status-indicator {
+  background: #c2414b;
+  box-shadow: 0 0 0 3px rgba(194, 65, 75, 0.12);
+}
+
+@keyframes status-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.camera-preview {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  place-items: center;
+  margin-bottom: 17px;
+  border: 1px solid #d7e4f4;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 50% 35%, #fff, transparent 72%),
+    #edf4fd;
+}
+
+.camera-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.camera-video[hidden] {
+  display: none;
+}
+
+.preview-placeholder {
+  display: flex;
+  max-width: 270px;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.preview-placeholder .camera-icon {
+  width: 28px;
+  height: 28px;
+  color: #6288bd;
 }
 
 .status-indicator {
@@ -178,8 +257,8 @@
   height: 8px;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: #dc7b86;
-  box-shadow: 0 0 0 3px rgba(220, 123, 134, 0.12);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .button {
@@ -201,18 +280,23 @@
 }
 
 .button:focus-visible {
-  outline: 2px solid #c0a8ff;
+  outline: 2px solid #2563eb;
   outline-offset: 3px;
 }
 
 .button-primary {
-  background: #8058d5;
+  background: var(--color-primary);
   color: #fff;
   cursor: pointer;
 }
 
 .button-primary:hover {
-  background: #9068e3;
+  background: var(--color-primary-hover);
+}
+
+.button-primary:disabled {
+  background: #8ba8d4;
+  cursor: wait;
 }
 
 .button-primary:active {
@@ -226,9 +310,9 @@
 
 .button-secondary {
   margin-top: 10px;
-  border-color: #343442;
-  background: #242430;
-  color: #777684;
+  border-color: #d0deef;
+  background: #e8eef7;
+  color: #536980;
   cursor: not-allowed;
 }
 
@@ -236,16 +320,36 @@
   opacity: 1;
 }
 
+.button-secondary:not(:disabled) {
+  border-color: #2563eb;
+  background: #eaf2ff;
+  color: #1d4ed8;
+  cursor: not-allowed;
+}
+
+.button-stop {
+  margin-top: 10px;
+  border-color: #c8d8ec;
+  background: #fff;
+  color: #24496f;
+  cursor: pointer;
+}
+
+.button-stop:hover {
+  border-color: #9ebce2;
+  background: #f2f7ff;
+}
+
 .permission-notice {
   margin: 11px 2px 0;
-  color: #d0bfef;
+  color: #7f2931;
   font-size: 12px;
   line-height: 1.55;
 }
 
 .availability-note {
   margin: 11px 0 0;
-  color: #858492;
+  color: var(--color-muted);
   font-size: 11px;
   text-align: center;
 }
@@ -261,9 +365,9 @@
   height: 40px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid #393148;
+  border: 1px solid #c7daf6;
   border-radius: 12px;
-  color: #bd9eff;
+  color: var(--color-primary);
   font-size: 12px;
   font-weight: 700;
 }
@@ -280,7 +384,7 @@
   display: flex;
   align-items: flex-start;
   gap: 11px;
-  color: #c1bfcb;
+  color: var(--color-text);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -293,8 +397,8 @@
   place-items: center;
   margin-top: 1px;
   border-radius: 50%;
-  background: rgba(155, 119, 230, 0.14);
-  color: #b89aff;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
   font-size: 11px;
   font-weight: 700;
 }
@@ -305,7 +409,7 @@
   justify-content: space-between;
   gap: 14px;
   margin-top: 28px;
-  color: #777684;
+  color: var(--color-muted);
   font-size: 11px;
 }
 
@@ -320,27 +424,27 @@
   border: 0;
   padding: 4px 0;
   background: transparent;
-  color: #b49af7;
+  color: var(--color-primary);
   cursor: pointer;
   font: inherit;
   font-size: 11px;
 }
 
 .footer-action:hover {
-  color: #d0bdff;
+  color: var(--color-primary-hover);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 .footer-action:focus-visible {
   border-radius: 3px;
-  outline: 2px solid #c0a8ff;
+  outline: 2px solid #2563eb;
   outline-offset: 3px;
 }
 
 .desktop-message {
   margin: 10px 0 0;
-  color: #a5a4b2;
+  color: var(--color-muted);
   font-size: 11px;
   text-align: right;
 }
@@ -380,6 +484,10 @@
 
   .rules-list {
     gap: 14px;
+  }
+
+  .camera-preview {
+    aspect-ratio: 4 / 3;
   }
 
   .page-footer {

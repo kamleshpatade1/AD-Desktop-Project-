@@ -8,8 +8,17 @@
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
   font-weight: 400;
-  color: #f3f1f9;
-  background: #0b0d14;
+  color: #15304b;
+  background: #f4f8ff;
+
+  --color-navy: #15304b;
+  --color-text: #40566f;
+  --color-muted: #60758e;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-soft: #eaf2ff;
+  --color-border: #d7e4f4;
+  --color-surface: #fff;
 }
 
 * {
@@ -27,5 +36,6 @@ button {
 }
 
 ::selection {
-  background: rgba(161, 126, 238, 0.4);
+  color: var(--color-navy);
+  background: #cfe0ff;
 }
