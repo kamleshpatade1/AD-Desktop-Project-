@@ -10,8 +10,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   min-height: 88px;
   border-bottom: 1px solid var(--color-border);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .brand {
@@ -70,6 +77,39 @@
   border-radius: 50%;
   background: var(--color-primary);
   box-shadow: 0 0 10px rgba(37, 99, 235, 0.32);
+}
+
+.fullscreen-button {
+  min-height: 38px;
+  border: 1px solid #b8cfee;
+  border-radius: 9px;
+  padding: 0 13px;
+  background: #fff;
+  color: #1d4ed8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.fullscreen-button:hover:not(:disabled) {
+  border-color: #8db5f2;
+  background: #f0f6ff;
+}
+
+.fullscreen-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.fullscreen-button:disabled {
+  border-color: #d7e1ee;
+  background: #edf1f7;
+  color: #74869b;
+  cursor: not-allowed;
 }
 
 .page-content {
@@ -442,6 +482,16 @@
   outline-offset: 3px;
 }
 
+.footer-action:disabled {
+  color: #74869b;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.footer-action:disabled:hover {
+  color: #74869b;
+}
+
 .desktop-message {
   margin: 10px 0 0;
   color: var(--color-muted);
@@ -456,10 +506,17 @@
 
   .topbar {
     min-height: 76px;
+    flex-wrap: wrap;
+    padding: 12px 0;
+  }
+
+  .topbar-actions {
+    gap: 8px;
   }
 
   .environment-label {
-    padding: 7px 9px;
+    gap: 0;
+    padding: 7px;
     font-size: 0;
   }
 

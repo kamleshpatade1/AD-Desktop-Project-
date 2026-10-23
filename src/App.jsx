@@ -32,6 +32,14 @@ function App() {
   const [cameraError, setCameraError] = useState('')
   const [cameraStream, setCameraStream] = useState(null)
   const [desktopMessage, setDesktopMessage] = useState('')
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const desktopApi = window.athena
+  const desktopAvailable = Boolean(
+    desktopApi?.setFullscreen &&
+    desktopApi?.getFullscreenState &&
+    desktopApi?.onFullscreenChanged &&
+    desktopApi?.showExamRules,
+  )
   const videoRef = useRef(null)
   const cameraStreamRef = useRef(null)
   const cameraRequestRef = useRef(0)
@@ -57,6 +65,40 @@ function App() {
       if (videoElement) {
         videoElement.srcObject = null
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    const api = window.athena
+    if (
+      !api?.setFullscreen ||
+      !api?.getFullscreenState ||
+      !api?.onFullscreenChanged ||
+      !api?.showExamRules
+    ) {
+      return undefined
+    }
+
+    let isMounted = true
+    const unsubscribe = api.onFullscreenChanged((enabled) => {
+      setIsFullscreen(enabled)
+    })
+
+    api.getFullscreenState()
+      .then((enabled) => {
+        if (isMounted) {
+          setIsFullscreen(enabled)
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setDesktopMessage('Could not read fullscreen state. Please try again.')
+        }
+      })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
     }
   }, [])
 
@@ -184,16 +226,29 @@ function App() {
   }
 
   async function handleRulesClick() {
-    if (!window.athena?.showExamRules) {
+    if (!desktopApi?.showExamRules) {
       setDesktopMessage('Native exam rules are available in the desktop app.')
       return
     }
 
     try {
-      await window.athena.showExamRules()
-      setDesktopMessage('Exam rules were shown in a desktop dialog.')
+      await desktopApi.showExamRules()
+      setDesktopMessage('Exam rules acknowledged.')
     } catch {
       setDesktopMessage('Could not show exam rules. Please try again.')
+    }
+  }
+
+  async function handleFullscreenClick() {
+    if (!desktopApi?.setFullscreen) {
+      setDesktopMessage('Fullscreen controls are available in the desktop app.')
+      return
+    }
+
+    try {
+      await desktopApi.setFullscreen(!isFullscreen)
+    } catch {
+      setDesktopMessage('Could not change fullscreen mode. Please try again.')
     }
   }
 
@@ -207,10 +262,21 @@ function App() {
             <span className="brand-subtitle">Desktop Exam Environment</span>
           </span>
         </div>
-        <span className="environment-label">
-          <span aria-hidden="true" className="environment-dot" />
-          Exam environment
-        </span>
+        <div className="topbar-actions">
+          <span className="environment-label">
+            <span aria-hidden="true" className="environment-dot" />
+            Exam environment
+          </span>
+          <button
+            aria-pressed={isFullscreen}
+            className="fullscreen-button"
+            disabled={!desktopAvailable}
+            onClick={handleFullscreenClick}
+            type="button"
+          >
+            {isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          </button>
+        </div>
       </header>
 
       <div className="page-content">
@@ -333,17 +399,28 @@ function App() {
         <footer className="page-footer">
           <span>Newton Athena · Ready when you are.</span>
           <div className="footer-actions">
-            <button className="footer-action" onClick={handleRulesClick} type="button">
-              View exam rules
+            <button
+              className="footer-action"
+              disabled={!desktopAvailable}
+              onClick={handleRulesClick}
+              type="button"
+            >
+              View Exam Rules
             </button>
-            <button className="footer-action" onClick={handleAboutClick} type="button">
+            <button
+              className="footer-action"
+              disabled={!desktopAvailable}
+              onClick={handleAboutClick}
+              type="button"
+            >
               About this app
             </button>
           </div>
         </footer>
-        {desktopMessage && (
+        {(desktopMessage || !desktopAvailable) && (
           <p aria-live="polite" className="desktop-message" role="status">
-            {desktopMessage}
+            {desktopMessage ||
+              'Desktop controls are available when you open Newton Athena as a desktop app.'}
           </p>
         )}
       </div>
