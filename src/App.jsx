@@ -42,6 +42,7 @@ function App() {
   const [cameraStream, setCameraStream] = useState(null)
   const [snapshotFolder, setSnapshotFolder] = useState('')
   const [snapshotMessage, setSnapshotMessage] = useState('')
+  const [snapshotMessageType, setSnapshotMessageType] = useState('info')
   const [isSavingSnapshot, setIsSavingSnapshot] = useState(false)
   const [durationMinutes, setDurationMinutes] = useState(DEFAULT_EXAM_DURATION_MINUTES)
   const [remainingSeconds, setRemainingSeconds] = useState(
@@ -316,6 +317,7 @@ function App() {
   async function handleSelectSnapshotFolder() {
     if (!desktopApi?.selectSnapshotFolder) {
       setSnapshotMessage('Folder selection is available in the desktop app.')
+      setSnapshotMessageType('error')
       return
     }
 
@@ -331,9 +333,11 @@ function App() {
           ? 'Snapshot folder selected.'
           : 'No folder selected. Choose a folder before capturing a snapshot.',
       )
+      setSnapshotMessageType(selectedFolder ? 'success' : 'info')
     } catch {
       if (mountedRef.current) {
         setSnapshotMessage('Could not open the folder picker. Please try again.')
+        setSnapshotMessageType('error')
       }
     }
   }
@@ -352,6 +356,7 @@ function App() {
     }
     if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
       setSnapshotMessage('The camera preview is not ready. Please try again.')
+      setSnapshotMessageType('error')
       return
     }
 
@@ -360,6 +365,7 @@ function App() {
     canvas.height = video.videoHeight
     setIsSavingSnapshot(true)
     setSnapshotMessage('')
+    setSnapshotMessageType('info')
 
     try {
       const context = canvas.getContext('2d')
@@ -377,12 +383,14 @@ function App() {
       const result = await desktopApi.saveSnapshot(pngDataUrl)
       if (mountedRef.current) {
         setSnapshotMessage(`Snapshot saved: ${result.filename}`)
+        setSnapshotMessageType('success')
       }
     } catch {
       if (mountedRef.current) {
         setSnapshotMessage(
           'Could not save the snapshot. Check the selected folder permissions and try again.',
         )
+        setSnapshotMessageType('error')
       }
     } finally {
       canvas.width = 0
@@ -471,6 +479,7 @@ function App() {
           </p>
         </section>
 
+        <div className="exam-grid">
         <section aria-labelledby="permission-title" className="permission-card">
           <div className="card-heading">
             <div className="camera-badge">
@@ -527,6 +536,7 @@ function App() {
               Select Snapshot Folder
             </button>
             <p
+              aria-label="Selected snapshot folder"
               className={`snapshot-folder${snapshotFolder ? ' snapshot-folder--selected' : ''}`}
               title={snapshotFolder || undefined}
             >
@@ -541,7 +551,11 @@ function App() {
               {isSavingSnapshot ? 'Saving Snapshot…' : 'Capture Snapshot'}
             </button>
             {snapshotMessage && (
-              <p aria-live="polite" className="snapshot-message" role="status">
+              <p
+                aria-live="polite"
+                className={`snapshot-message snapshot-message--${snapshotMessageType}`}
+                role={snapshotMessageType === 'error' ? 'alert' : 'status'}
+              >
                 {snapshotMessage}
               </p>
             )}
@@ -650,6 +664,7 @@ function App() {
             </button>
           )}
         </section>
+        </div>
 
         <section aria-labelledby="rules-title" className="rules-card">
           <div className="rules-heading">
