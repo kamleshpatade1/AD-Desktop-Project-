@@ -21,4 +21,11 @@ contextBridge.exposeInMainWorld('athena', {
     ipcRenderer.on('athena:fullscreen-changed', listener)
     return () => ipcRenderer.removeListener('athena:fullscreen-changed', listener)
   },
+  selectSnapshotFolder: () => ipcRenderer.invoke('athena:select-snapshot-folder'),
+  saveSnapshot: (dataUrl) => {
+    if (typeof dataUrl !== 'string') {
+      return Promise.reject(new TypeError('Snapshot data must be a string.'))
+    }
+    return ipcRenderer.invoke('athena:save-snapshot', dataUrl)
+  },
 })

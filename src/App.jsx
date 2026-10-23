@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
+const DEFAULT_EXAM_DURATION_MINUTES = 30
+const EXAM_DURATION_OPTIONS = [15, 30, 45, 60]
+
+function formatCountdown(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
 function CameraIcon() {
   return (
     <svg
@@ -31,6 +40,15 @@ function App() {
   const [cameraStatus, setCameraStatus] = useState('not-requested')
   const [cameraError, setCameraError] = useState('')
   const [cameraStream, setCameraStream] = useState(null)
+  const [snapshotFolder, setSnapshotFolder] = useState('')
+  const [snapshotMessage, setSnapshotMessage] = useState('')
+  const [isSavingSnapshot, setIsSavingSnapshot] = useState(false)
+  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_EXAM_DURATION_MINUTES)
+  const [remainingSeconds, setRemainingSeconds] = useState(
+    DEFAULT_EXAM_DURATION_MINUTES * 60,
+  )
+  const [sessionStatus, setSessionStatus] = useState('not-started')
+  const [sessionMessage, setSessionMessage] = useState('')
   const [desktopMessage, setDesktopMessage] = useState('')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const desktopApi = window.athena
@@ -40,11 +58,17 @@ function App() {
     desktopApi?.onFullscreenChanged &&
     desktopApi?.showExamRules,
   )
+  const snapshotApiAvailable = Boolean(
+    desktopApi?.selectSnapshotFolder && desktopApi?.saveSnapshot,
+  )
   const videoRef = useRef(null)
   const cameraStreamRef = useRef(null)
   const cameraRequestRef = useRef(0)
   const requestInProgressRef = useRef(false)
   const mountedRef = useRef(false)
+  const timerIntervalRef = useRef(null)
+  const sessionDeadlineRef = useRef(null)
+  const sessionStatusRef = useRef('not-started')
   const isCameraActive =
     cameraStatus === 'granted' &&
     cameraStream?.getVideoTracks().some((track) => track.readyState === 'live')
@@ -57,6 +81,11 @@ function App() {
       mountedRef.current = false
       cameraRequestRef.current += 1
       requestInProgressRef.current = false
+      // Clear the interval when the component unmounts to avoid a stray timer.
+      if (timerIntervalRef.current !== null) {
+        window.clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
       cameraStreamRef.current?.getTracks().forEach((track) => {
         track.onended = null
         track.stop()
@@ -115,6 +144,65 @@ function App() {
     }
   }, [cameraStream])
 
+  function finishSession(status, message) {
+    if (timerIntervalRef.current !== null) {
+      window.clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = null
+    }
+
+    if (status === 'completed') {
+      setRemainingSeconds(0)
+    } else if (sessionDeadlineRef.current !== null) {
+      setRemainingSeconds(
+        Math.max(0, Math.ceil((sessionDeadlineRef.current - Date.now()) / 1000)),
+      )
+    }
+
+    sessionDeadlineRef.current = null
+    sessionStatusRef.current = status
+    setSessionStatus(status)
+    setSessionMessage(message)
+  }
+
+  function handleStartExam() {
+    const hasLiveCamera =
+      cameraStreamRef.current?.getVideoTracks().some((track) => track.readyState === 'live')
+    if (!hasLiveCamera || sessionStatusRef.current === 'running') {
+      return
+    }
+
+    // The deadline keeps the displayed countdown accurate if an interval tick is delayed.
+    const durationSeconds = durationMinutes * 60
+    const deadline = Date.now() + durationSeconds * 1000
+    sessionDeadlineRef.current = deadline
+    sessionStatusRef.current = 'running'
+    setRemainingSeconds(durationSeconds)
+    setSessionStatus('running')
+    setSessionMessage('')
+
+    // Store one interval only; each tick updates countdown state from the deadline.
+    timerIntervalRef.current = window.setInterval(() => {
+      const secondsLeft = Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
+      if (secondsLeft === 0) {
+        finishSession('completed', 'Time is up. Your exam session is complete.')
+        return
+      }
+      setRemainingSeconds(secondsLeft)
+    }, 1000)
+  }
+
+  function handleEndExam() {
+    if (sessionStatusRef.current !== 'running') {
+      return
+    }
+
+    if (!window.confirm('Are you sure you want to end this exam session?')) {
+      return
+    }
+
+    finishSession('ended', 'Your exam session has ended.')
+  }
+
   async function handleCameraRequest() {
     if (requestInProgressRef.current || cameraStreamRef.current) {
       return
@@ -157,6 +245,13 @@ function App() {
             return
           }
 
+          if (sessionStatusRef.current === 'running') {
+            finishSession(
+              'ended',
+              'The camera stopped, so the exam session has ended.',
+            )
+          }
+
           stream.getTracks().forEach((streamTrack) => {
             streamTrack.onended = null
             streamTrack.stop()
@@ -193,6 +288,13 @@ function App() {
   }
 
   function handleStopCamera() {
+    if (sessionStatusRef.current === 'running') {
+      if (!window.confirm('Stopping the camera will end the active exam. Continue?')) {
+        return
+      }
+      finishSession('ended', 'The camera was stopped and the exam session has ended.')
+    }
+
     cameraRequestRef.current += 1
     requestInProgressRef.current = false
 
@@ -209,6 +311,86 @@ function App() {
     setCameraStream(null)
     setCameraStatus('not-requested')
     setCameraError('')
+  }
+
+  async function handleSelectSnapshotFolder() {
+    if (!desktopApi?.selectSnapshotFolder) {
+      setSnapshotMessage('Folder selection is available in the desktop app.')
+      return
+    }
+
+    try {
+      const selectedFolder = await desktopApi.selectSnapshotFolder()
+      if (!mountedRef.current) {
+        return
+      }
+
+      setSnapshotFolder(typeof selectedFolder === 'string' ? selectedFolder : '')
+      setSnapshotMessage(
+        selectedFolder
+          ? 'Snapshot folder selected.'
+          : 'No folder selected. Choose a folder before capturing a snapshot.',
+      )
+    } catch {
+      if (mountedRef.current) {
+        setSnapshotMessage('Could not open the folder picker. Please try again.')
+      }
+    }
+  }
+
+  async function handleCaptureSnapshot() {
+    const hasLiveCamera =
+      cameraStreamRef.current?.getVideoTracks().some((track) => track.readyState === 'live')
+    const video = videoRef.current
+    if (
+      !hasLiveCamera ||
+      !snapshotFolder ||
+      !desktopApi?.saveSnapshot ||
+      isSavingSnapshot
+    ) {
+      return
+    }
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      setSnapshotMessage('The camera preview is not ready. Please try again.')
+      return
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    setIsSavingSnapshot(true)
+    setSnapshotMessage('')
+
+    try {
+      const context = canvas.getContext('2d')
+      if (!context) {
+        throw new Error('The browser could not create a snapshot image.')
+      }
+
+      // Draw one frame from the live preview and convert only that frame to PNG.
+      context.translate(canvas.width, 0)
+      context.scale(-1, 1)
+      context.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const pngDataUrl = canvas.toDataURL('image/png')
+
+      // IPC receives image data only; the main process uses its stored folder selection.
+      const result = await desktopApi.saveSnapshot(pngDataUrl)
+      if (mountedRef.current) {
+        setSnapshotMessage(`Snapshot saved: ${result.filename}`)
+      }
+    } catch {
+      if (mountedRef.current) {
+        setSnapshotMessage(
+          'Could not save the snapshot. Check the selected folder permissions and try again.',
+        )
+      }
+    } finally {
+      canvas.width = 0
+      canvas.height = 0
+      if (mountedRef.current) {
+        setIsSavingSnapshot(false)
+      }
+    }
   }
 
   async function handleAboutClick() {
@@ -335,6 +517,41 @@ function App() {
             )}
           </div>
 
+          <div className="snapshot-panel">
+            <button
+              className="button button-secondary"
+              disabled={!snapshotApiAvailable || isSavingSnapshot}
+              onClick={handleSelectSnapshotFolder}
+              type="button"
+            >
+              Select Snapshot Folder
+            </button>
+            <p
+              className={`snapshot-folder${snapshotFolder ? ' snapshot-folder--selected' : ''}`}
+              title={snapshotFolder || undefined}
+            >
+              {snapshotFolder || 'No snapshot folder selected.'}
+            </p>
+            <button
+              className="button button-primary"
+              disabled={!isCameraActive || !snapshotFolder || !snapshotApiAvailable || isSavingSnapshot}
+              onClick={handleCaptureSnapshot}
+              type="button"
+            >
+              {isSavingSnapshot ? 'Saving Snapshot…' : 'Capture Snapshot'}
+            </button>
+            {snapshotMessage && (
+              <p aria-live="polite" className="snapshot-message" role="status">
+                {snapshotMessage}
+              </p>
+            )}
+            {!snapshotApiAvailable && (
+              <p className="snapshot-help">
+                Snapshot saving is available when you open Newton Athena as a desktop app.
+              </p>
+            )}
+          </div>
+
           {!isCameraActive && (
             <button
               className="button button-primary"
@@ -360,14 +577,78 @@ function App() {
           )}
           <button
             className="button button-secondary"
-            disabled={!isCameraActive}
+            disabled={!isCameraActive || sessionStatus === 'running'}
+            onClick={handleStartExam}
             type="button"
           >
             Start Exam
           </button>
           <p className="availability-note">
-            Start Exam will be available after camera permission is granted.
+            {!isCameraActive
+              ? 'Start Exam will be available after camera permission is granted.'
+              : 'Camera is ready for your exam session.'}
           </p>
+        </section>
+
+        <section aria-labelledby="session-title" className="session-card">
+          <div className="session-heading">
+            <div>
+              <span className="eyebrow">EXAM SESSION</span>
+              <h2 id="session-title">Session timer</h2>
+            </div>
+            <span className={`session-status session-status--${sessionStatus}`}>
+              {sessionStatus === 'not-started' && 'Not started'}
+              {sessionStatus === 'running' && 'In progress'}
+              {sessionStatus === 'ended' && 'Ended'}
+              {sessionStatus === 'completed' && 'Completed'}
+            </span>
+          </div>
+          <div className="duration-setting">
+            <label htmlFor="exam-duration">Exam duration</label>
+            <select
+              disabled={sessionStatus === 'running'}
+              id="exam-duration"
+              onChange={(event) => {
+                const selectedMinutes = Number(event.target.value)
+                setDurationMinutes(selectedMinutes)
+                setRemainingSeconds(selectedMinutes * 60)
+                setSessionMessage('')
+                if (sessionStatus === 'ended' || sessionStatus === 'completed') {
+                  sessionStatusRef.current = 'not-started'
+                  setSessionStatus('not-started')
+                }
+              }}
+              value={durationMinutes}
+            >
+              {EXAM_DURATION_OPTIONS.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes} minutes
+                </option>
+              ))}
+            </select>
+          </div>
+          <div aria-live="polite" className="countdown" role="timer">
+            {formatCountdown(remainingSeconds)}
+          </div>
+          <p className="session-description">
+            {sessionStatus === 'running'
+              ? 'Time remaining'
+              : `Prototype duration: ${durationMinutes} minutes`}
+          </p>
+          {sessionMessage && (
+            <p aria-live="polite" className="session-message" role="status">
+              {sessionMessage}
+            </p>
+          )}
+          {sessionStatus === 'running' && (
+            <button
+              className="button button-stop end-exam-button"
+              onClick={handleEndExam}
+              type="button"
+            >
+              End Exam
+            </button>
+          )}
         </section>
 
         <section aria-labelledby="rules-title" className="rules-card">
