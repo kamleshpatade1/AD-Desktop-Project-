@@ -16,10 +16,10 @@ not enforce exam rules.
 - Native fullscreen toggle. Fullscreen can be exited with Escape or normal
   macOS window controls; the app does not use kiosk mode.
 - Native **View Exam Rules** dialog with an acknowledgement button.
-- Native folder picker and manual **Capture Snapshot** action.
+- Native folder picker for automatic exam snapshots.
 - Automatic still-image snapshots every 10 seconds while an exam session is
-  running. Automatic and manual snapshots are saved as timestamped PNG files
-  in the selected folder.
+  running. Snapshots are saved as timestamped PNG files in the selected
+  folder.
 - Blue-and-white responsive interface with browser fallbacks for desktop-only
   actions.
 
@@ -70,11 +70,11 @@ browser, those controls are disabled and the UI explains why.
    macOS asks. The preview appears once a live camera stream is available.
 2. Click **Select Snapshot Folder** and choose a folder where you have write
    permission. The selected path is shown in the camera panel.
-3. The app clearly notes that, while an exam is running, it automatically saves
-   one still image every 10 seconds to the selected folder. There is no audio
-   or video recording.
-4. With the live preview active and a folder selected, click **Capture
-   Snapshot** to save an additional single PNG immediately.
+3. While an exam is running, the app automatically saves one still image every
+   10 seconds to the selected folder. The first automatic image is saved after
+   the first 10 seconds. There is no audio or video recording.
+4. Click **Start Exam**. The first automatic snapshot is saved after 10
+   seconds, followed by one every 10 seconds while the session is running.
 5. Click **Stop Camera** when you are done using the preview.
 
 Snapshot folder selection is held by the Electron main process for the current
@@ -86,9 +86,10 @@ and selected folder. Automatic captures stop when the exam ends or completes.
 
 Select a duration in the **Session timer** card. The prototype defaults to 30
 minutes and offers 15, 30, 45, and 60 minutes. **Start Exam** is enabled only
-while the camera has a live video track. **End Exam** asks for confirmation.
-When time reaches zero, the session is marked complete. Losing the camera also
-ends an active session.
+when the camera has a live video track, a snapshot folder is selected, and the
+Electron snapshot-saving API is available. **End Exam** asks for confirmation.
+When time reaches zero, the session is marked complete. Losing or stopping the
+camera also ends an active session and stops automatic snapshots.
 
 The timer is local UI state. It is not a trusted clock, cannot prevent leaving
 the app, and does not submit or save an exam.
@@ -98,7 +99,9 @@ the app, and does not submit or save an exam.
 | Command | Purpose |
 | --- | --- |
 | `npm run electron:dev` | Start Vite and launch the Electron development window. |
-| `npm run dev` | Start only the Vite renderer for browser development. |
+| `npm run frontend` | Start Vite on `127.0.0.1:5173` for the Electron development app. |
+| `npm run electron` | Wait for Vite at `127.0.0.1:5173`, then launch Electron; start `frontend` separately first. |
+| `npm run dev` | Start Vite with its default settings for browser development. |
 | `npm run build` | Build the React renderer into `dist/`. This does not package Electron. |
 | `npm run lint` | Run ESLint across the project. |
 | `npm run preview` | Preview the built Vite renderer; this does not launch Electron. |
@@ -170,7 +173,8 @@ proctoring, or assessment platform.
 - Choose a folder using **Select Snapshot Folder**; the choice is not retained
   after the app closes.
 - Make sure the folder is writable and has available disk space.
-- Keep the camera preview active and wait for it to display before capturing.
+- Keep the camera preview active and wait for it to display before starting the
+  exam.
 - Automatic captures are written only while the exam timer is running and stop
   when that session ends.
 

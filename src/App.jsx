@@ -216,7 +216,7 @@ function App() {
       }
 
       try {
-        const filename = await captureAndSaveSnapshot({ automatic: true })
+        const filename = await captureAndSaveSnapshot()
         if (filename && mountedRef.current) {
           setSnapshotMessage(`Automatic snapshot saved: ${filename}`)
           setSnapshotMessageType('success')
@@ -373,7 +373,7 @@ function App() {
       setSnapshotMessage(
         selectedFolder
           ? 'Snapshot folder selected.'
-          : 'No folder selected. Choose a folder before capturing a snapshot.',
+          : 'No folder selected. Choose a folder before starting the exam.',
       )
       setSnapshotMessageType(selectedFolder ? 'success' : 'info')
     } catch {
@@ -384,7 +384,7 @@ function App() {
     }
   }
 
-  async function captureAndSaveSnapshot({ automatic = false } = {}) {
+  async function captureAndSaveSnapshot() {
     const hasLiveCamera =
       cameraStreamRef.current?.getVideoTracks().some((track) => track.readyState === 'live')
     const video = videoRef.current
@@ -393,7 +393,7 @@ function App() {
       !snapshotFolderRef.current ||
       !desktopApi?.saveSnapshot ||
       snapshotSaveInProgressRef.current ||
-      (automatic && sessionStatusRef.current !== 'running')
+      sessionStatusRef.current !== 'running'
     ) {
       return null
     }
@@ -428,29 +428,6 @@ function App() {
       snapshotSaveInProgressRef.current = false
       if (mountedRef.current) {
         setIsSavingSnapshot(false)
-      }
-    }
-  }
-
-  async function handleCaptureSnapshot() {
-    if (snapshotSaveInProgressRef.current) {
-      return
-    }
-
-    setSnapshotMessage('')
-    setSnapshotMessageType('info')
-    try {
-      const filename = await captureAndSaveSnapshot()
-      if (filename && mountedRef.current) {
-        setSnapshotMessage(`Snapshot saved: ${filename}`)
-        setSnapshotMessageType('success')
-      }
-    } catch {
-      if (mountedRef.current) {
-        setSnapshotMessage(
-          'Could not save the snapshot. Check the camera preview and selected folder permissions.',
-        )
-        setSnapshotMessageType('error')
       }
     }
   }
@@ -600,14 +577,6 @@ function App() {
             >
               {snapshotFolder || 'No snapshot folder selected.'}
             </p>
-            <button
-              className="button button-primary"
-              disabled={!isCameraActive || !snapshotFolder || !snapshotApiAvailable || isSavingSnapshot}
-              onClick={handleCaptureSnapshot}
-              type="button"
-            >
-              {isSavingSnapshot ? 'Saving Snapshot…' : 'Capture Snapshot'}
-            </button>
             {snapshotMessage && (
               <p
                 aria-live="polite"
