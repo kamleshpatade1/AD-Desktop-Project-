@@ -16,14 +16,16 @@ not enforce exam rules.
 - Native fullscreen toggle. Fullscreen can be exited with Escape or normal
   macOS window controls; the app does not use kiosk mode.
 - Native **View Exam Rules** dialog with an acknowledgement button.
-- Native folder picker and manual **Capture Snapshot** action. A click captures
-  one frame from the preview and saves it as a timestamped PNG in the chosen
-  folder.
+- Native folder picker and manual **Capture Snapshot** action.
+- Automatic still-image snapshots every 10 seconds while an exam session is
+  running. Automatic and manual snapshots are saved as timestamped PNG files
+  in the selected folder.
 - Blue-and-white responsive interface with browser fallbacks for desktop-only
   actions.
 
-The app does not record video, automatically capture images, or implement exam
-submission, authentication, a backend, or a database.
+The app does not record video or audio, capture images in the background when
+an exam is not running, or implement exam submission, authentication, a
+backend, or a database.
 
 ## Prerequisites (macOS)
 
@@ -68,14 +70,17 @@ browser, those controls are disabled and the UI explains why.
    macOS asks. The preview appears once a live camera stream is available.
 2. Click **Select Snapshot Folder** and choose a folder where you have write
    permission. The selected path is shown in the camera panel.
-3. With the live preview active and a folder selected, click **Capture
-   Snapshot**. Only this click captures an image. The app saves one PNG with a
-   timestamp-based filename in the selected folder.
-4. Click **Stop Camera** when you are done using the preview.
+3. The app clearly notes that, while an exam is running, it automatically saves
+   one still image every 10 seconds to the selected folder. There is no audio
+   or video recording.
+4. With the live preview active and a folder selected, click **Capture
+   Snapshot** to save an additional single PNG immediately.
+5. Click **Stop Camera** when you are done using the preview.
 
 Snapshot folder selection is held by the Electron main process for the current
-window and is not persisted after the app closes. Captures are still images;
-there is no background or automatic recording.
+window and is not persisted after the app closes. Select a folder before
+starting the exam; the start button remains unavailable without a live camera
+and selected folder. Automatic captures stop when the exam ends or completes.
 
 ## Exam timer
 
@@ -131,8 +136,9 @@ uses the browser media API directly in response to a user action.
   rather than raw IPC or Node.js access.
 - The main process validates snapshot input and writes only PNG data into the
   folder chosen through the native folder picker.
-- Camera video is used for the live preview and a single user-requested
-  snapshot. There is no audio capture, recording, or automatic image capture.
+- Camera video is used for the live preview and for user-requested still
+  snapshots, including automatic still snapshots every 10 seconds during an
+  active exam. There is no audio or video recording.
 - The timer and displayed states are prototype UI behavior, not tamper-resistant
   controls. Fullscreen is optional and can be exited normally.
 
@@ -165,6 +171,8 @@ proctoring, or assessment platform.
   after the app closes.
 - Make sure the folder is writable and has available disk space.
 - Keep the camera preview active and wait for it to display before capturing.
+- Automatic captures are written only while the exam timer is running and stop
+  when that session ends.
 
 ### Native desktop actions are disabled
 

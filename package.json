@@ -6,7 +6,9 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
-    "electron:dev": "concurrently -k \"vite --host 127.0.0.1 --port 5173 --strictPort\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "frontend": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "electron": "wait-on http://127.0.0.1:5173 && electron .",
+    "electron:dev": "concurrently -k \"npm run frontend\" \"npm run electron\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

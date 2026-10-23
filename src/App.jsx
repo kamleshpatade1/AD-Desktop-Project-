@@ -3,6 +3,7 @@ import './App.css'
 
 const DEFAULT_EXAM_DURATION_MINUTES = 30
 const EXAM_DURATION_OPTIONS = [15, 30, 45, 60]
+const AUTOMATIC_SNAPSHOT_INTERVAL_MS = 10_000
 
 function formatCountdown(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -68,6 +69,9 @@ function App() {
   const requestInProgressRef = useRef(false)
   const mountedRef = useRef(false)
   const timerIntervalRef = useRef(null)
+  const snapshotIntervalRef = useRef(null)
+  const snapshotSaveInProgressRef = useRef(false)
+  const snapshotFolderRef = useRef('')
   const sessionDeadlineRef = useRef(null)
   const sessionStatusRef = useRef('not-started')
   const isCameraActive =
@@ -86,6 +90,10 @@ function App() {
       if (timerIntervalRef.current !== null) {
         window.clearInterval(timerIntervalRef.current)
         timerIntervalRef.current = null
+      }
+      if (snapshotIntervalRef.current !== null) {
+        window.clearInterval(snapshotIntervalRef.current)
+        snapshotIntervalRef.current = null
       }
       cameraStreamRef.current?.getTracks().forEach((track) => {
         track.onended = null
@@ -150,6 +158,10 @@ function App() {
       window.clearInterval(timerIntervalRef.current)
       timerIntervalRef.current = null
     }
+    if (snapshotIntervalRef.current !== null) {
+      window.clearInterval(snapshotIntervalRef.current)
+      snapshotIntervalRef.current = null
+    }
 
     if (status === 'completed') {
       setRemainingSeconds(0)
@@ -168,7 +180,13 @@ function App() {
   function handleStartExam() {
     const hasLiveCamera =
       cameraStreamRef.current?.getVideoTracks().some((track) => track.readyState === 'live')
-    if (!hasLiveCamera || sessionStatusRef.current === 'running') {
+    if (
+      !hasLiveCamera ||
+      !snapshotFolderRef.current ||
+      !desktopApi?.saveSnapshot ||
+      sessionStatusRef.current === 'running' ||
+      timerIntervalRef.current !== null
+    ) {
       return
     }
 
@@ -190,6 +208,28 @@ function App() {
       }
       setRemainingSeconds(secondsLeft)
     }, 1000)
+
+    // Save one user-visible, timestamped still image every ten seconds while the exam runs.
+    snapshotIntervalRef.current = window.setInterval(async () => {
+      if (sessionStatusRef.current !== 'running') {
+        return
+      }
+
+      try {
+        const filename = await captureAndSaveSnapshot({ automatic: true })
+        if (filename && mountedRef.current) {
+          setSnapshotMessage(`Automatic snapshot saved: ${filename}`)
+          setSnapshotMessageType('success')
+        }
+      } catch {
+        if (mountedRef.current) {
+          setSnapshotMessage(
+            'Automatic snapshot failed. Check that the selected folder is writable.',
+          )
+          setSnapshotMessageType('error')
+        }
+      }
+    }, AUTOMATIC_SNAPSHOT_INTERVAL_MS)
   }
 
   function handleEndExam() {
@@ -328,6 +368,8 @@ function App() {
       }
 
       setSnapshotFolder(typeof selectedFolder === 'string' ? selectedFolder : '')
+      snapshotFolderRef.current =
+        typeof selectedFolder === 'string' ? selectedFolder : ''
       setSnapshotMessage(
         selectedFolder
           ? 'Snapshot folder selected.'
@@ -342,30 +384,28 @@ function App() {
     }
   }
 
-  async function handleCaptureSnapshot() {
+  async function captureAndSaveSnapshot({ automatic = false } = {}) {
     const hasLiveCamera =
       cameraStreamRef.current?.getVideoTracks().some((track) => track.readyState === 'live')
     const video = videoRef.current
     if (
       !hasLiveCamera ||
-      !snapshotFolder ||
+      !snapshotFolderRef.current ||
       !desktopApi?.saveSnapshot ||
-      isSavingSnapshot
+      snapshotSaveInProgressRef.current ||
+      (automatic && sessionStatusRef.current !== 'running')
     ) {
-      return
+      return null
     }
     if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
-      setSnapshotMessage('The camera preview is not ready. Please try again.')
-      setSnapshotMessageType('error')
-      return
+      throw new Error('The camera preview is not ready. Please try again.')
     }
 
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
+    snapshotSaveInProgressRef.current = true
     setIsSavingSnapshot(true)
-    setSnapshotMessage('')
-    setSnapshotMessageType('info')
 
     try {
       const context = canvas.getContext('2d')
@@ -381,22 +421,36 @@ function App() {
 
       // IPC receives image data only; the main process uses its stored folder selection.
       const result = await desktopApi.saveSnapshot(pngDataUrl)
+      return result.filename
+    } finally {
+      canvas.width = 0
+      canvas.height = 0
+      snapshotSaveInProgressRef.current = false
       if (mountedRef.current) {
-        setSnapshotMessage(`Snapshot saved: ${result.filename}`)
+        setIsSavingSnapshot(false)
+      }
+    }
+  }
+
+  async function handleCaptureSnapshot() {
+    if (snapshotSaveInProgressRef.current) {
+      return
+    }
+
+    setSnapshotMessage('')
+    setSnapshotMessageType('info')
+    try {
+      const filename = await captureAndSaveSnapshot()
+      if (filename && mountedRef.current) {
+        setSnapshotMessage(`Snapshot saved: ${filename}`)
         setSnapshotMessageType('success')
       }
     } catch {
       if (mountedRef.current) {
         setSnapshotMessage(
-          'Could not save the snapshot. Check the selected folder permissions and try again.',
+          'Could not save the snapshot. Check the camera preview and selected folder permissions.',
         )
         setSnapshotMessageType('error')
-      }
-    } finally {
-      canvas.width = 0
-      canvas.height = 0
-      if (mountedRef.current) {
-        setIsSavingSnapshot(false)
       }
     }
   }
@@ -529,7 +583,11 @@ function App() {
           <div className="snapshot-panel">
             <button
               className="button button-secondary"
-              disabled={!snapshotApiAvailable || isSavingSnapshot}
+              disabled={
+                !snapshotApiAvailable ||
+                isSavingSnapshot ||
+                sessionStatus === 'running'
+              }
               onClick={handleSelectSnapshotFolder}
               type="button"
             >
@@ -564,6 +622,10 @@ function App() {
                 Snapshot saving is available when you open Newton Athena as a desktop app.
               </p>
             )}
+            <p className="snapshot-help">
+              While an exam is running, one still image is saved every 10 seconds
+              to this folder. Audio and video are not recorded.
+            </p>
           </div>
 
           {!isCameraActive && (
@@ -591,7 +653,13 @@ function App() {
           )}
           <button
             className="button button-secondary"
-            disabled={!isCameraActive || sessionStatus === 'running'}
+            disabled={
+              !isCameraActive ||
+              !snapshotFolder ||
+              !snapshotApiAvailable ||
+              isSavingSnapshot ||
+              sessionStatus === 'running'
+            }
             onClick={handleStartExam}
             type="button"
           >
@@ -600,7 +668,11 @@ function App() {
           <p className="availability-note">
             {!isCameraActive
               ? 'Start Exam will be available after camera permission is granted.'
-              : 'Camera is ready for your exam session.'}
+                    : !snapshotApiAvailable
+                      ? 'Start Exam and automatic snapshots are available in the Electron desktop app.'
+                      : !snapshotFolder
+                      ? 'Select a snapshot folder before starting the exam.'
+                      : 'Camera and snapshot folder are ready for your exam session.'}
           </p>
         </section>
 
